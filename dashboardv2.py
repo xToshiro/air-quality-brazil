@@ -83,7 +83,7 @@ if st.session_state["banco_selecionado"]:
         db_path = os.path.join(fonte_dados_dir, st.session_state["banco_selecionado"])
         st.session_state["dados_tabela"] = load_table_data(db_path, tabela_selecionada)
 
-# Intervalo de Tempo com Calendário
+# Intervalo de Tempo com Calendário e mapa interativo
 if st.session_state["dados_tabela"] is not None:
     st.sidebar.write("### Intervalo de Tempo")
     df = st.session_state["dados_tabela"]
@@ -94,7 +94,6 @@ if st.session_state["dados_tabela"] is not None:
         min_date = df['date'].min().date()
         max_date = df['date'].max().date()
 
-        # Calendário de seleção
         date_input = st.sidebar.date_input(
             "Selecione o Intervalo de Tempo:",
             [min_date, max_date],
@@ -102,46 +101,46 @@ if st.session_state["dados_tabela"] is not None:
             max_value=max_date
         )
 
-        # Verifica se o intervalo foi selecionado corretamente
         if isinstance(date_input, (list, tuple)) and len(date_input) == 2:
             data_inicio, data_fim = date_input
-            dados_filtrados = df[(df['date'] >= pd.Timestamp(data_inicio)) & (df['date'] <= pd.Timestamp(data_fim))]
-            st.write(f"### Dados Filtrados de {data_inicio} a {data_fim}")
-            st.dataframe(dados_filtrados)
-        else:
-            st.sidebar.info("Selecione um intervalo de datas (início e fim).")
+            df = df[(df['date'] >= pd.Timestamp(data_inicio)) & (df['date'] <= pd.Timestamp(data_fim))]
+
+    # Campo para Selecionar o Identificador do Dispositivo
+    st.sidebar.write("### Coluna do Identificador do Dispositivo")
+    col_id = st.sidebar.selectbox("Selecione a Coluna do Identificador", df.columns, index=df.columns.get_loc("moqa_id") if "moqa_id" in df.columns else 0)
+
+    if col_id and "latitude" in df.columns and "longitude" in df.columns:
+        # Capturar coordenadas únicas
+        dispositivos = df[[col_id, "latitude", "longitude"]].dropna().drop_duplicates()
+
+        # Calcular o centro do mapa
+        center_lat = dispositivos['latitude'].mean()
+        center_lon = dispositivos['longitude'].mean()
+
+        # Plotar dispositivos no mapa
+        st.write("### Localização dos Dispositivos no Mapa")
+        mapa = px.scatter_mapbox(
+            dispositivos,
+            lat="latitude",
+            lon="longitude",
+            hover_name=col_id,
+            color_discrete_sequence=["#006400"],  # Verde escuro
+            size=[15] * len(dispositivos),  # Tamanho fixo maior dos pontos
+            height=600
+        )
+        mapa.update_layout(
+            mapbox_style="open-street-map",
+            mapbox_center={"lat": center_lat, "lon": center_lon},
+            mapbox_zoom=5,
+            margin={"r": 0, "t": 0, "l": 0, "b": 0}
+        )
+        st.plotly_chart(mapa, use_container_width=True)
+
     else:
-        st.sidebar.warning("A tabela selecionada não contém o campo 'date'.")
+        st.sidebar.warning("Certifique-se de que a tabela contém 'latitude', 'longitude' e o identificador selecionado.")
 
-# Filtros de Estado e Cidade
-st.sidebar.write("---")
-estado_selecionado = st.sidebar.selectbox("Estado", estados['nome'].sort_values())
-cidades_estado = municipios[municipios['codigo_uf'] == estados[estados['nome'] == estado_selecionado]['codigo_uf'].values[0]]
-cidade_selecionada = st.sidebar.selectbox("Cidade", cidades_estado['nome'].sort_values())
-
-# Mapa Interativo
-estado_info = estados[estados['nome'] == estado_selecionado].iloc[0]
-cidade_info = cidades_estado[cidades_estado['nome'] == cidade_selecionada].iloc[0]
-
-mapa = px.scatter_mapbox(
-    pd.DataFrame({
-        'Nome': [estado_selecionado, cidade_selecionada],
-        'Latitude': [estado_info['latitude'], cidade_info['latitude']],
-        'Longitude': [estado_info['longitude'], cidade_info['longitude']],
-        'Tipo': ['Estado', 'Cidade']
-    }),
-    lat="Latitude",
-    lon="Longitude",
-    text="Nome",
-    zoom=6 if cidade_selecionada else 4,
-    height=600
-)
-
-mapa.update_layout(mapbox_style="open-street-map", margin={"r": 0, "t": 0, "l": 0, "b": 0})
-
-# Layout principal com mapa
-col1, col2 = st.columns([1, 3])
-with col1:
-    st.sidebar.markdown("### Selecione os parâmetros ao lado.")
-with col2:
-    st.plotly_chart(mapa, use_container_width=True)
+    # Tabela filtrada
+    st.write("### Dados Filtrados")
+    st.dataframe(df)
+else:
+    st.sidebar.info("Carregue um banco e selecione uma tabela para visualizar os dados.")
