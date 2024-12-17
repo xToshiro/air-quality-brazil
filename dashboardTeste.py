@@ -74,7 +74,8 @@ if st.session_state["banco_selecionado"]:
         "Selecione a Tabela",
         st.session_state["tabelas_disponiveis"],
         index=None,
-        placeholder="Escolha uma tabela..."
+        placeholder="Escolha uma tabela...",
+        key="tabela_selecionada_key"
     )
 
     if tabela_selecionada and tabela_selecionada != st.session_state["tabela_selecionada"]:
@@ -82,6 +83,7 @@ if st.session_state["banco_selecionado"]:
         db_path = os.path.join(fonte_dados_dir, st.session_state["banco_selecionado"])
         st.session_state["dados_tabela"] = load_table_data(db_path, tabela_selecionada)
 
+# Intervalo de Tempo com Calendário e mapa interativo
 if st.session_state["dados_tabela"] is not None:
     st.sidebar.write("### Intervalo de Tempo")
     df = st.session_state["dados_tabela"]
@@ -89,7 +91,6 @@ if st.session_state["dados_tabela"] is not None:
     if "date" in df.columns:
         df['date'] = pd.to_datetime(df['date'], format='%Y-%m-%d', errors='coerce')
         df = df.dropna(subset=['date'])
-
         min_date = df['date'].min().date()
         max_date = df['date'].max().date()
 
@@ -104,68 +105,44 @@ if st.session_state["dados_tabela"] is not None:
             data_inicio, data_fim = date_input
             df = df[(df['date'] >= pd.Timestamp(data_inicio)) & (df['date'] <= pd.Timestamp(data_fim))]
 
-    # Configuração das colunas
-    st.sidebar.write("### Configuração das Colunas")
-    col_id = st.sidebar.selectbox("Coluna de Identificador do Dispositivo", df.columns)
-    dispositivos_unicos = df[col_id].dropna().unique()
-    dispositivos_selecionados = st.sidebar.multiselect("Selecione os Dispositivos", dispositivos_unicos, default=dispositivos_unicos)
-    
-    hour_col = st.sidebar.selectbox("Coluna de Horas", df.columns, index=None)
-    temp_col = st.sidebar.selectbox("Coluna de Temperatura", df.columns)
-    humidity_col = st.sidebar.selectbox("Coluna de Umidade", df.columns)
-    pm_col = st.sidebar.selectbox("Coluna de Material Particulado", df.columns)
+    # Campo para Selecionar o Identificador do Dispositivo
+    st.sidebar.write("### Coluna do Identificador do Dispositivo")
+    col_id = st.sidebar.selectbox("Selecione a Coluna do Identificador", df.columns, index=df.columns.get_loc("moqa_id") if "moqa_id" in df.columns else 0)
 
-    # Combinação de date e hour
-    if hour_col:
-        df['datetime'] = pd.to_datetime(df['date'].astype(str) + ' ' + df[hour_col].astype(str), errors='coerce')
+    if col_id and "latitude" in df.columns and "longitude" in df.columns:
+        # Capturar coordenadas únicas
+        dispositivos = df[[col_id, "latitude", "longitude"]].dropna().drop_duplicates()
+
+        # Calcular limites (bounding box)
+        min_lat, max_lat = dispositivos['latitude'].min(), dispositivos['latitude'].max()
+        min_lon, max_lon = dispositivos['longitude'].min(), dispositivos['longitude'].max()
+        center_lat = (min_lat + max_lat) / 2
+        center_lon = (min_lon + max_lon) / 2
+
+        # Plotar dispositivos no mapa
+        st.write("### Localização dos Dispositivos no Mapa")
+        mapa = px.scatter_mapbox(
+            dispositivos,
+            lat="latitude",
+            lon="longitude",
+            hover_name=col_id,
+            color_discrete_sequence=["#006400"],  # Verde escuro
+            size=[15] * len(dispositivos),  # Tamanho fixo maior dos pontos
+            height=600
+        )
+        mapa.update_layout(
+            mapbox_style="open-street-map",
+            mapbox_center={"lat": center_lat, "lon": center_lon},
+            mapbox_zoom=11,  # Zoom ajustado para focar nos dispositivos
+            margin={"r": 0, "t": 0, "l": 0, "b": 0}
+        )
+        st.plotly_chart(mapa, use_container_width=True)
+
     else:
-        df['datetime'] = df['date']
-    df = df.dropna(subset=['datetime'])
+        st.sidebar.warning("Certifique-se de que a tabela contém 'latitude', 'longitude' e o identificador selecionado.")
 
-    # Filtragem de dispositivos
-    df = df[df[col_id].isin(dispositivos_selecionados)]
-
-    # Sliders
-    temp_min, temp_max = df[temp_col].min(), df[temp_col].max()
-    temp_filter = st.sidebar.slider("Temperatura (°C)", temp_min-5, temp_max+5, (temp_min, temp_max))
-
-    humid_min, humid_max = df[humidity_col].min(), df[humidity_col].max()
-    humid_filter = st.sidebar.slider("Umidade Relativa (%)", humid_min-5, humid_max+5, (humid_min, humid_max))
-
-    pm_min, pm_max = df[pm_col].min(), df[pm_col].max()
-    pm_filter = st.sidebar.slider("Material Particulado (µg/m³)", pm_min-5, pm_max+5, (pm_min, pm_max))
-
-    # Aplicar filtros
-    df_filtered = df[
-        (df[temp_col].between(temp_filter[0], temp_filter[1])) &
-        (df[humidity_col].between(humid_filter[0], humid_filter[1])) &
-        (df[pm_col].between(pm_filter[0], pm_filter[1]))
-    ]
-
-    # Mapa no topo
-    st.write("### Localização dos Dispositivos no Mapa")
-    dispositivos = df_filtered[[col_id, "latitude", "longitude"]].dropna().drop_duplicates()
-    mapa = px.scatter_mapbox(
-        dispositivos,
-        lat="latitude",
-        lon="longitude",
-        hover_name=col_id,
-        color_discrete_sequence=["#006400"],
-        size=[15] * len(dispositivos),
-        height=600
-    )
-    mapa.update_layout(mapbox_style="open-street-map", mapbox_zoom=11)
-    st.plotly_chart(mapa, use_container_width=True)
-
-    # Gráficos ajustados
-    st.write("### Gráfico de Temperatura")
-    st.plotly_chart(px.line(df_filtered, x='datetime', y=temp_col, color=col_id, title="Temperatura ao Longo do Tempo"))
-
-    st.write("### Gráfico de Umidade")
-    st.plotly_chart(px.line(df_filtered, x='datetime', y=humidity_col, color=col_id, title="Umidade Relativa (%)"))
-
-    st.write("### Gráfico de Material Particulado")
-    st.plotly_chart(px.line(df_filtered, x='datetime', y=pm_col, color=col_id, title="Material Particulado (µg/m³)"))
-
+    # Tabela filtrada
     st.write("### Dados Filtrados")
-    st.dataframe(df_filtered)
+    st.dataframe(df)
+else:
+    st.sidebar.info("Carregue um banco e selecione uma tabela para visualizar os dados.")
