@@ -6,86 +6,128 @@ import plotly.express as px
 import streamlit as st
 from datetime import datetime
 
-# Configuração inicial do Streamlit
-st.set_page_config(page_title="Qualidade do Ar no Brasil", layout="wide")
+# Initial Streamlit Configuration
+st.set_page_config(
+    page_title="Air Quality Brazil - Dashboard",
+    layout="wide",
+    page_icon="🌎",
+)
 
-# Função para carregar dados JSON
+# Custom green theme CSS
+st.markdown(
+    """
+    <style>
+        /* Sidebar styling */
+        [data-testid="stSidebar"] {
+            background-color: #196a19; /* Dark green sidebar */
+        }
+        /* Title and headers styling */
+        h1, h2, h3, h4 {
+            color: #006400; /* Dark green headers */
+        }
+        /* General background color */
+        .css-18e3th9 {
+            background-color: #f8fff8;
+        }
+        /* Button styling */
+        .stButton>button {
+            background-color: #228B22; /* Forest green */
+            color: white;
+            border-radius: 10px;
+        }
+        .stButton>button:hover {
+            background-color: #006400; /* Dark green hover */
+        }
+        /* Adjust color for success button when active */
+        .stButton>button:active {
+            background-color: #98FB98; /* Light green active */
+            color: black;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+
+# Function to load JSON data
 @st.cache_data
 def load_json_data():
     with open('./data/estados.json', 'r', encoding='utf-8-sig') as f:
-        estados = pd.DataFrame(json.load(f))
+        states = pd.DataFrame(json.load(f))
     with open('./data/municipios.json', 'r', encoding='utf-8-sig') as f:
-        municipios = pd.DataFrame(json.load(f))
-    return estados, municipios
+        cities = pd.DataFrame(json.load(f))
+    return states, cities
 
-# Função para listar bancos de dados SQLite
+# Function to list SQLite databases in a directory
 def list_sqlite_databases(path):
     return [f for f in os.listdir(path) if f.endswith('.sqlite')]
 
-# Função para listar tabelas no banco de dados SQLite
+# Function to list tables within a SQLite database
 def list_tables_in_sqlite(db_path):
     with sqlite3.connect(db_path) as conn:
         query = "SELECT name FROM sqlite_master WHERE type='table';"
         tables = pd.read_sql_query(query, conn)
     return tables['name'].tolist()
 
-# Função para carregar dados da tabela
+# Function to load data from a specific table
 def load_table_data(db_path, table_name):
     with sqlite3.connect(db_path) as conn:
         df = pd.read_sql_query(f"SELECT * FROM {table_name}", conn)
     return df
 
-# Carregar dados JSON
-estados, municipios = load_json_data()
+# Load JSON data
+states, cities = load_json_data()
 
-# Inicializar Session State
-if "dados_tabela" not in st.session_state:
-    st.session_state["dados_tabela"] = None
-if "tabela_selecionada" not in st.session_state:
-    st.session_state["tabela_selecionada"] = None
-if "banco_selecionado" not in st.session_state:
-    st.session_state["banco_selecionado"] = None
-if "tabelas_disponiveis" not in st.session_state:
-    st.session_state["tabelas_disponiveis"] = []
+# Initialize session state for managing selections
+if "loaded_data" not in st.session_state:
+    st.session_state["loaded_data"] = None
+if "selected_table" not in st.session_state:
+    st.session_state["selected_table"] = None
+if "selected_database" not in st.session_state:
+    st.session_state["selected_database"] = None
+if "available_tables" not in st.session_state:
+    st.session_state["available_tables"] = []
 
-# Sidebar - Configurações
-st.sidebar.header("Configurações de Filtros")
+# Sidebar filters
+st.sidebar.header("Data Configuration")
 
-# Fonte de Dados SQLite
-st.sidebar.write("### Fonte de Dados (SQLite)")
-fonte_dados_dir = "./data/air-quality-data/"
-bancos_sqlite = list_sqlite_databases(fonte_dados_dir)
+# SQLite Data Source
+st.sidebar.subheader("Data Source (SQLite)")
+data_directory = "./data/air-quality-data/"
+sqlite_databases = list_sqlite_databases(data_directory)
 
-# Seleção de banco de dados
-novo_banco = st.sidebar.selectbox("Selecione o Banco de Dados", bancos_sqlite, index=None, placeholder="Escolha um banco de dados...")
+# Dropdown to select database
+new_database = st.sidebar.selectbox("Select a Database", sqlite_databases, index=None, placeholder="Choose a database...")
 
-# Botão para carregar tabelas
-if st.sidebar.button("Carregar Fonte de Dados") and novo_banco:
-    db_path = os.path.join(fonte_dados_dir, novo_banco)
-    st.session_state["tabelas_disponiveis"] = list_tables_in_sqlite(db_path)
-    st.session_state["banco_selecionado"] = novo_banco
-    st.session_state["dados_tabela"] = None
-    st.session_state["tabela_selecionada"] = None
-    st.sidebar.success(f"Banco de Dados '{novo_banco}' carregado com sucesso!")
+# Button to load tables
+if st.sidebar.button("Load Data Source") and new_database:
+    db_path = os.path.join(data_directory, new_database)
+    st.session_state["available_tables"] = list_tables_in_sqlite(db_path)
+    st.session_state["selected_database"] = new_database
+    st.session_state["loaded_data"] = None
+    st.session_state["selected_table"] = None
+    st.sidebar.success(f"Database '{new_database}' loaded successfully!")
 
-# Seleção de Tabela
-if st.session_state["banco_selecionado"]:
-    tabela_selecionada = st.sidebar.selectbox(
-        "Selecione a Tabela",
-        st.session_state["tabelas_disponiveis"],
+# Table selection
+if st.session_state["selected_database"]:
+    selected_table = st.sidebar.selectbox(
+        "Select a Table",
+        st.session_state["available_tables"],
         index=None,
-        placeholder="Escolha uma tabela..."
+        placeholder="Choose a table..."
     )
 
-    if tabela_selecionada and tabela_selecionada != st.session_state["tabela_selecionada"]:
-        st.session_state["tabela_selecionada"] = tabela_selecionada
-        db_path = os.path.join(fonte_dados_dir, st.session_state["banco_selecionado"])
-        st.session_state["dados_tabela"] = load_table_data(db_path, tabela_selecionada)
+    if selected_table and selected_table != st.session_state["selected_table"]:
+        st.session_state["selected_table"] = selected_table
+        db_path = os.path.join(data_directory, st.session_state["selected_database"])
+        st.session_state["loaded_data"] = load_table_data(db_path, selected_table)
 
-if st.session_state["dados_tabela"] is not None:
-    st.sidebar.write("### Intervalo de Tempo")
-    df = st.session_state["dados_tabela"]
+# Main content
+if st.session_state["loaded_data"] is not None:
+    df = st.session_state["loaded_data"]
 
+    # Sidebar filter for time range
+    st.sidebar.subheader("Filter by Time Range")
     if "date" in df.columns:
         df['date'] = pd.to_datetime(df['date'], format='%Y-%m-%d', errors='coerce')
         df = df.dropna(subset=['date'])
@@ -94,78 +136,108 @@ if st.session_state["dados_tabela"] is not None:
         max_date = df['date'].max().date()
 
         date_input = st.sidebar.date_input(
-            "Selecione o Intervalo de Tempo:",
+            "Select Date Range:",
             [min_date, max_date],
             min_value=min_date,
             max_value=max_date
         )
 
         if isinstance(date_input, (list, tuple)) and len(date_input) == 2:
-            data_inicio, data_fim = date_input
-            df = df[(df['date'] >= pd.Timestamp(data_inicio)) & (df['date'] <= pd.Timestamp(data_fim))]
+            start_date, end_date = date_input
+            df = df[(df['date'] >= pd.Timestamp(start_date)) & (df['date'] <= pd.Timestamp(end_date))]
 
-    # Configuração das colunas
-    st.sidebar.write("### Configuração das Colunas")
-    col_id = st.sidebar.selectbox("Coluna de Identificador do Dispositivo", df.columns)
-    dispositivos_unicos = df[col_id].dropna().unique()
-    dispositivos_selecionados = st.sidebar.multiselect("Selecione os Dispositivos", dispositivos_unicos, default=dispositivos_unicos)
-    
-    hour_col = st.sidebar.selectbox("Coluna de Horas", df.columns, index=None)
-    temp_col = st.sidebar.selectbox("Coluna de Temperatura", df.columns)
-    humidity_col = st.sidebar.selectbox("Coluna de Umidade", df.columns)
-    pm_col = st.sidebar.selectbox("Coluna de Material Particulado", df.columns)
+    # Device ID filter
+    st.sidebar.subheader("Device Filters")
+    device_id_col = st.sidebar.selectbox("Device Identifier Column", df.columns)
+    unique_devices = df[device_id_col].dropna().unique()
+    selected_devices = st.sidebar.multiselect("Select Devices", unique_devices, default=unique_devices)
 
-    # Combinação de date e hour
-    if hour_col:
-        df['datetime'] = pd.to_datetime(df['date'].astype(str) + ' ' + df[hour_col].astype(str), errors='coerce')
+    # Column selection for measurements
+    hour_col = st.sidebar.selectbox("Hour Column", df.columns, index=None)
+    temp_col = st.sidebar.selectbox("Temperature Column", df.columns, index=None)
+    humidity_col = st.sidebar.selectbox("Humidity Column", df.columns, index=None)
+    pm_col = st.sidebar.selectbox("Particulate Matter Column", df.columns, index=None)
+
+       # Apply data filtering and validation
+    if temp_col and humidity_col and pm_col:
+        # Combine date and hour into a single datetime column
+        if hour_col:
+            df['datetime'] = pd.to_datetime(df['date'].astype(str) + ' ' + df[hour_col].astype(str), errors='coerce')
+        else:
+            df['datetime'] = df['date']
+        df = df.dropna(subset=['datetime'])
+
+        # Filter by selected devices
+        df = df[df[device_id_col].isin(selected_devices)]
+
+        # Sidebar sliders for temperature, humidity, and particulate matter
+        st.sidebar.subheader("Measurement Filters")
+        temp_min, temp_max = df[temp_col].min(), df[temp_col].max()
+        temp_range = st.sidebar.slider("Temperature (°C)", float(temp_min - 5), float(temp_max + 5), (float(temp_min), float(temp_max)))
+
+        humid_min, humid_max = df[humidity_col].min(), df[humidity_col].max()
+        humidity_range = st.sidebar.slider("Relative Humidity (%)", float(humid_min - 5), float(humid_max + 5), (float(humid_min), float(humid_max)))
+
+        pm_min, pm_max = df[pm_col].min(), df[pm_col].max()
+        pm_range = st.sidebar.slider("Particulate Matter (µg/m³)", float(pm_min - 5), float(pm_max + 5), (float(pm_min), float(pm_max)))
+
+        # Apply measurement filters
+        df_filtered = df[
+            (df[temp_col].between(temp_range[0], temp_range[1])) &
+            (df[humidity_col].between(humidity_range[0], humidity_range[1])) &
+            (df[pm_col].between(pm_range[0], pm_range[1]))
+        ]
+
+        # Display filtered results
+        st.write("### Device Locations on the Map")
+        device_locations = df_filtered[[device_id_col, "latitude", "longitude"]].dropna().drop_duplicates()
+        map_chart = px.scatter_mapbox(
+            device_locations,
+            lat="latitude",
+            lon="longitude",
+            hover_name=device_id_col,
+            color_discrete_sequence=["#006400"],
+            size=[15] * len(device_locations),
+            height=600
+        )
+        map_chart.update_layout(mapbox_style="open-street-map", mapbox_zoom=11)
+        st.plotly_chart(map_chart, use_container_width=True)
+
+        # Temperature line chart
+        st.write("### Temperature Over Time")
+        st.plotly_chart(
+            px.line(df_filtered, x='datetime', y=temp_col, color=device_id_col, title="Temperature Over Time")
+        )
+
+        # Humidity line chart
+        st.write("### Relative Humidity")
+        st.plotly_chart(
+            px.line(df_filtered, x='datetime', y=humidity_col, color=device_id_col, title="Relative Humidity (%)")
+        )
+
+        # Particulate Matter chart
+        st.write("### Particulate Matter Levels")
+        st.plotly_chart(
+            px.line(df_filtered, x='datetime', y=pm_col, color=device_id_col, title="Particulate Matter (µg/m³)")
+        )
+
+        # Display the filtered data in a table
+        st.write("### Filtered Data Table")
+        st.dataframe(df_filtered)
+
     else:
-        df['datetime'] = df['date']
-    df = df.dropna(subset=['datetime'])
+        st.sidebar.warning("Please select all required columns (Temperature, Humidity, and Particulate Matter).")
 
-    # Filtragem de dispositivos
-    df = df[df[col_id].isin(dispositivos_selecionados)]
+else:
+    st.info("Please load a database and select a table to begin.")
 
-    # Sliders
-    temp_min, temp_max = df[temp_col].min(), df[temp_col].max()
-    temp_filter = st.sidebar.slider("Temperatura (°C)", temp_min-5, temp_max+5, (temp_min, temp_max))
+# About Section (in a hidden expander)
+with st.expander("About the Project"):
+    st.markdown("""
+    **Laboratory of Transport and Environment (TRAMA)**  
+    Department of Transport Engineering (DET)  
+    Federal University of Ceará (UFC)  
 
-    humid_min, humid_max = df[humidity_col].min(), df[humidity_col].max()
-    humid_filter = st.sidebar.slider("Umidade Relativa (%)", humid_min-5, humid_max+5, (humid_min, humid_max))
-
-    pm_min, pm_max = df[pm_col].min(), df[pm_col].max()
-    pm_filter = st.sidebar.slider("Material Particulado (µg/m³)", pm_min-5, pm_max+5, (pm_min, pm_max))
-
-    # Aplicar filtros
-    df_filtered = df[
-        (df[temp_col].between(temp_filter[0], temp_filter[1])) &
-        (df[humidity_col].between(humid_filter[0], humid_filter[1])) &
-        (df[pm_col].between(pm_filter[0], pm_filter[1]))
-    ]
-
-    # Mapa no topo
-    st.write("### Localização dos Dispositivos no Mapa")
-    dispositivos = df_filtered[[col_id, "latitude", "longitude"]].dropna().drop_duplicates()
-    mapa = px.scatter_mapbox(
-        dispositivos,
-        lat="latitude",
-        lon="longitude",
-        hover_name=col_id,
-        color_discrete_sequence=["#006400"],
-        size=[15] * len(dispositivos),
-        height=600
-    )
-    mapa.update_layout(mapbox_style="open-street-map", mapbox_zoom=11)
-    st.plotly_chart(mapa, use_container_width=True)
-
-    # Gráficos ajustados
-    st.write("### Gráfico de Temperatura")
-    st.plotly_chart(px.line(df_filtered, x='datetime', y=temp_col, color=col_id, title="Temperatura ao Longo do Tempo"))
-
-    st.write("### Gráfico de Umidade")
-    st.plotly_chart(px.line(df_filtered, x='datetime', y=humidity_col, color=col_id, title="Umidade Relativa (%)"))
-
-    st.write("### Gráfico de Material Particulado")
-    st.plotly_chart(px.line(df_filtered, x='datetime', y=pm_col, color=col_id, title="Material Particulado (µg/m³)"))
-
-    st.write("### Dados Filtrados")
-    st.dataframe(df_filtered)
+    **Developer:** Jairo Ivo Castro Brito  
+    [GitHub Repository](https://github.com/xToshiro/)
+    """)
