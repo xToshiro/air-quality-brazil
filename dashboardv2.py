@@ -214,19 +214,70 @@ if st.session_state["loaded_data"] is not None:
             (df[pm_col].between(pm_range[0], pm_range[1]))
         ]
 
-        # Display filtered results
-        st.write("### Device Locations on the Map")
-        device_locations = df_filtered[[device_id_col, "latitude", "longitude"]].dropna().drop_duplicates()
+       # Calculate stats for each device
+        stats = (
+            df_filtered.groupby(device_id_col)
+            .agg(
+                temp_min=(temp_col, "min"),
+                temp_max=(temp_col, "max"),
+                temp_mean=(temp_col, lambda x: round(x.mean(), 2)),
+                temp_min_time=("datetime", lambda x: df_filtered.loc[x.idxmin(), "datetime"]),
+                temp_max_time=("datetime", lambda x: df_filtered.loc[x.idxmax(), "datetime"]),
+                humid_min=(humidity_col, "min"),
+                humid_max=(humidity_col, "max"),
+                humid_mean=(humidity_col, lambda x: round(x.mean(), 2)),
+                humid_min_time=("datetime", lambda x: df_filtered.loc[x.idxmin(), "datetime"]),
+                humid_max_time=("datetime", lambda x: df_filtered.loc[x.idxmax(), "datetime"]),
+                pm_min=(pm_col, "min"),
+                pm_max=(pm_col, "max"),
+                pm_mean=(pm_col, lambda x: round(x.mean(), 2)),
+                pm_min_time=("datetime", lambda x: df_filtered.loc[x.idxmin(), "datetime"]),
+                pm_max_time=("datetime", lambda x: df_filtered.loc[x.idxmax(), "datetime"]),
+                latitude=("latitude", "first"),
+                longitude=("longitude", "first"),
+            )
+            .reset_index()
+        )
+
+        # Prepare hover data for the map
+        stats["hover_info"] = stats.apply(
+            lambda row: (
+                f"Device: {row[device_id_col]}<br>"
+                f"Temperature: Min {row['temp_min']:.2f}°C at {row['temp_min_time']}<br>"
+                f"Temperature: Max {row['temp_max']:.2f}°C at {row['temp_max_time']}<br>"
+                f"Temperature: Mean {row['temp_mean']:.2f}°C<br>"
+                f"Humidity: Min {row['humid_min']:.2f}% at {row['humid_min_time']}<br>"
+                f"Humidity: Max {row['humid_max']:.2f}% at {row['humid_max_time']}<br>"
+                f"Humidity: Mean {row['humid_mean']:.2f}%<br>"
+                f"Particulate Matter: Min {row['pm_min']:.2f} µg/m³ at {row['pm_min_time']}<br>"
+                f"Particulate Matter: Max {row['pm_max']:.2f} µg/m³ at {row['pm_max_time']}<br>"
+                f"Particulate Matter: Mean {row['pm_mean']:.2f} µg/m³"
+            ),
+            axis=1,
+        )
+
+     # Display map with hover data
+        st.write("### Device Locations with Measurements")
         map_chart = px.scatter_mapbox(
-            device_locations,
+            stats,
             lat="latitude",
             lon="longitude",
-            hover_name=device_id_col,
+            hover_name="hover_info",
             color_discrete_sequence=["#006400"],
-            size=[15] * len(device_locations),
+            size=[15] * len(stats),
             height=600
         )
-        map_chart.update_layout(mapbox_style="open-street-map", mapbox_zoom=11)
+        
+        # Update layout to increase font size in hover boxes
+        map_chart.update_layout(
+            mapbox_style="open-street-map",
+            mapbox_zoom=11,
+            hoverlabel=dict(
+                font_size=14,  # Set the font size for hover text
+                font_family="Arial"  # Optionally, set a font family
+            )
+        )
+        
         st.plotly_chart(map_chart, use_container_width=True)
 
         # Temperature line chart
