@@ -5,6 +5,8 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 from datetime import datetime
+from PIL import Image
+import base64
 
 # Initial Streamlit Configuration
 st.set_page_config(
@@ -13,7 +15,7 @@ st.set_page_config(
     page_icon="🌎",
 )
 
-# Custom green theme CSS
+# Custom CSS for sidebar styling
 st.markdown(
     """
     <style>
@@ -38,17 +40,41 @@ st.markdown(
         .stButton>button:hover {
             background-color: #006400; /* Dark green hover */
         }
-        /* Adjust color for success button when active */
-        .stButton>button:active {
-            background-color: #98FB98; /* Light green active */
-            color: black;
+        /* Logo container styling */
+        .logo-container {
+            background-color: #e0e0e0; /* Light gray background */
+            border-radius: 15px; /* Rounded corners */
+            padding: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .logo-container img {
+            width: 100%; /* Responsive width */
+            max-width: 300px; /* Max width for the logo */
         }
     </style>
     """,
     unsafe_allow_html=True
 )
 
+# Helper function to convert an image to base64
+def image_to_base64(image_path):
+    with open(image_path, "rb") as img_file:
+        return base64.b64encode(img_file.read()).decode("utf-8")
 
+# Load and display the logo in a styled container
+logo_path = "./images/logo_footer.png"
+if os.path.exists(logo_path):
+    logo_base64 = image_to_base64(logo_path)
+    logo_html = f"""
+    <div class="logo-container">
+        <img src="data:image/png;base64,{logo_base64}" alt="TRAMA Logo">
+    </div>
+    """
+    st.sidebar.markdown(logo_html, unsafe_allow_html=True)
+else:
+    st.sidebar.error("Logo not found. Please check the path and file name.")
+    
 # Function to load JSON data
 @st.cache_data
 def load_json_data():
