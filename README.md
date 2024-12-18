@@ -56,9 +56,7 @@ To use this dashboard with your data:
 
 More datasets will be added in future releases.
 
----
-
-## 🛠️ How to Run
+## 🌎 How to Run
 
 ### Requirements
 - **Python 3.9+**
@@ -70,6 +68,7 @@ More datasets will be added in future releases.
 
 ### Installation
 
+#### Option 1: Run Directly (Without Virtual Environment)
 1. Clone the repository:
    ```bash
    git clone https://github.com/xToshiro/air-quality-dashboard.git
@@ -86,7 +85,42 @@ More datasets will be added in future releases.
    streamlit run dashboardv2.py
    ```
 
----
+#### Option 2: Run with Virtual Environment (Recommended)
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/xToshiro/air-quality-dashboard.git
+   cd air-quality-dashboard
+   ```
+
+2. Create a virtual environment:
+   ```bash
+   python -m venv venv
+   ```
+
+3. Activate the virtual environment:
+   - **Windows**:
+     ```bash
+     venv\Scripts\activate
+     ```
+   - **Linux/Mac**:
+     ```bash
+     source venv/bin/activate
+     ```
+
+4. Install the dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+5. Run the Streamlit application:
+   ```bash
+   streamlit run dashboardv2.py
+   ```
+
+6. (Optional) Deactivate the virtual environment after use:
+   ```bash
+   deactivate
+   ```
 
 ## 🎨 Screenshots
 
