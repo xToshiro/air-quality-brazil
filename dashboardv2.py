@@ -258,8 +258,32 @@ if st.session_state["loaded_data"] is not None:
             axis=1,
         )
 
-        # Adicionando o Switch e Configurações do Mapa de Calor
-        st.sidebar.subheader("Heatmap Configuration")
+        # Display map with hover data
+        st.write("### Device Locations with Measurements")
+        map_chart = px.scatter_mapbox(
+            stats,
+            lat="latitude",
+            lon="longitude",
+            hover_name="hover_info",
+            color_discrete_sequence=["#006400"],
+            size=[15] * len(stats),
+            height=600
+        )
+
+        # Update layout to increase font size in hover boxes
+        map_chart.update_layout(
+            mapbox_style="open-street-map",
+            mapbox_zoom=11,
+            hoverlabel=dict(
+                font_size=14,  # Set the font size for hover text
+                font_family="Arial"  # Optionally, set a font family
+            )
+        )
+        
+        st.plotly_chart(map_chart, use_container_width=True)
+
+        # More visuaisations
+        st.sidebar.subheader("More Charts")
 
         # Switch para habilitar ou desabilitar o mapa de calor
         heatmap_enabled = st.sidebar.checkbox("Enable Heatmap Visualization")
@@ -351,7 +375,7 @@ if st.session_state["loaded_data"] is not None:
                 
                 # Atualizando configurações do layout do mapa de calor
                 heatmap_chart.update_layout(
-                    mapbox_zoom=8,  # Ajustando o zoom padrão
+                    mapbox_zoom=10,  # Ajustando o zoom padrão
                     coloraxis_colorbar=dict(
                         title=f"{heatmap_variable} ({heatmap_stat})",
                         titleside="right"
@@ -385,30 +409,100 @@ if st.session_state["loaded_data"] is not None:
             )
             st.plotly_chart(scatter_fig, use_container_width=True)
 
-
-        # Display map with hover data
-        st.write("### Device Locations with Measurements")
-        map_chart = px.scatter_mapbox(
-            stats,
-            lat="latitude",
-            lon="longitude",
-            hover_name="hover_info",
-            color_discrete_sequence=["#006400"],
-            size=[15] * len(stats),
-            height=600
-        )
-        
-        # Update layout to increase font size in hover boxes
-        map_chart.update_layout(
-            mapbox_style="open-street-map",
-            mapbox_zoom=11,
-            hoverlabel=dict(
-                font_size=14,  # Set the font size for hover text
-                font_family="Arial"  # Optionally, set a font family
+        # Correlation Matrix Heatmap with Dynamic Sizing
+        if st.sidebar.checkbox("Enable Correlation Heatmap"):
+            st.sidebar.subheader("Correlation Matrix Configuration")
+            
+            # Allow user to select columns for the correlation matrix
+            numeric_columns = df_filtered.select_dtypes(include=[np.number]).columns.tolist()
+            selected_columns = st.sidebar.multiselect(
+                "Select Columns for Correlation Matrix",
+                numeric_columns,
+                default=numeric_columns  # Pre-select all numeric columns by default
             )
-        )
+            
+            if selected_columns:
+                # Compute correlation matrix only for selected columns
+                correlation_matrix = df_filtered[selected_columns].corr()
+                
+                # Dynamically set figure size based on the number of variables
+                num_vars = len(selected_columns)
+                fig_width = 400 + (num_vars * 40)  # Base width plus additional per variable
+                fig_height = 400 + (num_vars * 40)  # Base height plus additional per variable
+                
+                # Display correlation matrix heatmap
+                st.write("### Correlation Matrix Heatmap")
+                correlation_fig = px.imshow(
+                    correlation_matrix,
+                    text_auto=True,
+                    color_continuous_scale="RdBu_r",
+                    title="Correlation Matrix",
+                    labels=dict(color="Correlation"),
+                )
+                
+                # Update layout to adjust figure size dynamically
+                correlation_fig.update_layout(
+                    autosize=False,
+                    width=fig_width,
+                    height=fig_height,
+                    margin=dict(l=10, r=10, t=40, b=10)  # Reduce margins for better fit
+                )
+                
+                st.plotly_chart(correlation_fig, use_container_width=False)  # Disable container width for custom sizing
+            else:
+                st.warning("Please select at least one column to compute the correlation matrix.")
+                
         
-        st.plotly_chart(map_chart, use_container_width=True)
+        # Advanced Statistical Summary with Side-by-Side Boxplots
+        if st.sidebar.checkbox("Enable Statistical Summary"):
+            st.sidebar.subheader("Statistical Summary Configuration")
+            
+            # Allow user to select columns for statistical analysis
+            numeric_columns = df_filtered.select_dtypes(include=[np.number]).columns.tolist()
+            selected_stats_columns = st.sidebar.multiselect(
+                "Select Columns for Statistical Summary",
+                numeric_columns,
+                default=numeric_columns  # Pre-select all numeric columns by default
+            )
+            
+            if selected_stats_columns:
+                # Compute descriptive statistics for selected columns
+                stats_summary = df_filtered[selected_stats_columns].describe().transpose()
+                st.write("### Statistical Summary")
+                st.dataframe(stats_summary)
+                
+                # Generate side-by-side boxplots
+                st.write("### Boxplots for Selected Variables")
+                from plotly.subplots import make_subplots
+                import plotly.graph_objects as go
+
+                # Create a subplot for boxplots
+                fig = make_subplots(rows=1, cols=len(selected_stats_columns), shared_yaxes=True)
+
+                for idx, variable in enumerate(selected_stats_columns, start=1):
+                    fig.add_trace(
+                        go.Box(
+                            y=df_filtered[variable],
+                            name=variable,
+                            boxmean=True  # Show mean on the boxplot
+                        ),
+                        row=1, col=idx
+                    )
+                
+                # Update layout for better display
+                fig.update_layout(
+                    title="Boxplots for Selected Variables",
+                    template="plotly_white",
+                    showlegend=False,
+                    height=500,
+                    width=300 * len(selected_stats_columns),  # Adjust width dynamically
+                    margin=dict(l=40, r=40, t=40, b=40)
+                )
+                
+                # Display the combined boxplots
+                st.plotly_chart(fig, use_container_width=False)
+            else:
+                st.warning("Please select at least one column for the statistical summary and boxplots.")
 
         # Temperature line chart
         st.write("### Temperature Over Time")

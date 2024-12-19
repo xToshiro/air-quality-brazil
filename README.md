@@ -26,11 +26,11 @@ The data includes air quality records from **August 1, 2024, to August 6, 2024**
 - **Graphs**: Line charts for temperature, humidity, and particulate matter
 - **Map**: Devices displayed on a map with geolocations
 - **Filters**: Time range, device selection, and data thresholds
+- **Implement New Visualizations**: Heatmaps, scatter plots, and advanced charts
 
 ### 🔄 To Do
 - **Import Additional Sources**: Integrate other air quality networks
 - **Enhance Statistical Analysis**: Add in-depth statistics and summary insights
-- **Implement New Visualizations**: Heatmaps, scatter plots, and advanced charts
 - **Calculate AQI (Air Quality Index)**: Automatic AQI calculations in the dashboard
 
 ---
@@ -134,6 +134,27 @@ More datasets will be added in future releases.
 - **Interactive Heatmap** Visualize spatial distribution of measurements like Temperature, Humidity, or Particulate Matter.
 
 ![Heatmap Example](images/heatmap.png)
+
+- **Correlation Matrix and Scatter Plot** 
+
+  - Analyze relationships between variables using an interactive correlation matrix and scatter plot matrix.
+
+  - Easily identify strong correlations or patterns.
+
+
+![Correlation Matrix Example](images/correlation_matrix.png)
+
+![Scatter Plot Matrix Example](images/scatter_plot.png)
+
+
+- **Advanced Statistical Summary**
+
+  - Summarize key statistics (mean, median, etc.) for selected variables.
+
+  - Visualize distributions using side-by-side boxplots for better insights.
+
+
+![Statistical Summary Example](images/statistical_summary.png)
 
 ---
 
