@@ -360,6 +360,31 @@ if st.session_state["loaded_data"] is not None:
                 
                 # Exibir o heatmap no Streamlit
                 st.plotly_chart(heatmap_chart, use_container_width=True)
+                
+        # Scatter Plot Visualization
+        if st.sidebar.checkbox("Enable Scatter Plot"):
+            st.sidebar.subheader("Scatter Plot Configuration")
+            
+            # Dropdowns to select x and y variables
+            x_variable = st.sidebar.selectbox("Select X Variable", df_filtered.columns)
+            y_variable = st.sidebar.selectbox("Select Y Variable", df_filtered.columns)
+            
+            # Select color grouping
+            color_group = st.sidebar.selectbox("Group by Color", [None] + list(df_filtered.columns), index=0)
+            
+            # Display scatter plot
+            st.write("### Scatter Plot")
+            scatter_fig = px.scatter(
+                df_filtered,
+                x=x_variable,
+                y=y_variable,
+                color=color_group,
+                title=f"Scatter Plot: {x_variable} vs {y_variable}",
+                labels={x_variable: x_variable, y_variable: y_variable},
+                template="plotly_white"
+            )
+            st.plotly_chart(scatter_fig, use_container_width=True)
+
 
         # Display map with hover data
         st.write("### Device Locations with Measurements")
