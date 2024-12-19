@@ -131,6 +131,10 @@ More datasets will be added in future releases.
 
 ![Dashboard Example](images/dashboard_example.png)
 
+- **Interactive Heatmap** Visualize spatial distribution of measurements like Temperature, Humidity, or Particulate Matter.
+
+![Heatmap Example](images/heatmap.png)
+
 ---
 
 ## 🤝 Contributions

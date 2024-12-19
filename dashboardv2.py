@@ -7,6 +7,8 @@ import streamlit as st
 from datetime import datetime
 from PIL import Image
 import base64
+from scipy.interpolate import griddata
+import numpy as np
 
 # Initial Streamlit Configuration
 st.set_page_config(
@@ -256,7 +258,110 @@ if st.session_state["loaded_data"] is not None:
             axis=1,
         )
 
-     # Display map with hover data
+        # Adicionando o Switch e Configurações do Mapa de Calor
+        st.sidebar.subheader("Heatmap Configuration")
+
+        # Switch para habilitar ou desabilitar o mapa de calor
+        heatmap_enabled = st.sidebar.checkbox("Enable Heatmap Visualization")
+
+        if heatmap_enabled:
+            # Campo para selecionar a variável
+            heatmap_variable = st.sidebar.selectbox(
+                "Select Variable for Heatmap",
+                ["Temperature", "Humidity", "Particulate Matter"],
+                index=0  # Pré-selecionado como "Temperature"
+            )
+            
+            # Campo para selecionar a estatística
+            heatmap_stat = st.sidebar.radio(
+                "Select Statistic",
+                ["Min", "Max", "Mean"],
+                index=1  # Pré-selecionado como "Max"
+            )
+            
+            # Slider para ajustar o raio do mapa de calor
+            heatmap_radius = st.sidebar.slider(
+                "Adjust Heatmap Radius",
+                min_value=1,  # Valor mínimo do raio
+                max_value=100,  # Valor máximo do raio
+                value=20,  # Valor padrão
+                step=1  # Incremento
+            )
+            
+            # Slider para ajustar a transparência do mapa de calor
+            heatmap_opacity = st.sidebar.slider(
+                "Adjust Heatmap Transparency",
+                min_value=0.1,  # Transparência mínima
+                max_value=1.0,  # Opacidade máxima
+                value=0.8,  # Valor padrão
+                step=0.1  # Incremento
+            )
+            
+            # Mapeando a variável para a coluna correspondente no DataFrame
+            variable_map = {
+                "Temperature": temp_col,
+                "Humidity": humidity_col,
+                "Particulate Matter": pm_col
+            }
+            
+            selected_column = variable_map[heatmap_variable]
+            
+            # Ajustando o DataFrame com base na estatística selecionada
+            stat_map = {
+                "Min": "min",
+                "Max": "max",
+                "Mean": lambda x: round(x.mean(), 2)
+            }
+            
+            # Capturando valores únicos de cada dispositivo
+            unique_device_data = (
+                df_filtered.groupby([device_id_col, "latitude", "longitude"])
+                .agg({selected_column: stat_map[heatmap_stat]})
+                .reset_index()
+                .rename(columns={selected_column: "value"})
+            )
+            
+            # Normalizando os valores para comparação visual
+            unique_device_data["normalized_value"] = (
+                (unique_device_data["value"] - unique_device_data["value"].min()) /
+                (unique_device_data["value"].max() - unique_device_data["value"].min())
+            )
+
+            # Verificar se existem dados suficientes para o mapa de calor
+            if unique_device_data.empty:
+                st.warning("No data available for the selected configuration.")
+            else:
+                st.write(f"### Heatmap for {heatmap_stat} {heatmap_variable}")
+                
+                # Configurando o mapa de calor com comparação de valores únicos
+                heatmap_chart = px.density_mapbox(
+                    unique_device_data,
+                    lat="latitude",
+                    lon="longitude",
+                    z="value",  # Usar valores reais para densidade
+                    radius=heatmap_radius,  # Usar valor ajustável pelo slider
+                    center=dict(lat=unique_device_data["latitude"].mean(), lon=unique_device_data["longitude"].mean()),
+                    mapbox_style="open-street-map",
+                    color_continuous_scale="Inferno",  # Escala de cores para valores quentes
+                    title=f"{heatmap_stat} {heatmap_variable} Heatmap",
+                )
+                
+                # Aplicar a transparência ao heatmap
+                heatmap_chart.update_traces(opacity=heatmap_opacity)
+                
+                # Atualizando configurações do layout do mapa de calor
+                heatmap_chart.update_layout(
+                    mapbox_zoom=8,  # Ajustando o zoom padrão
+                    coloraxis_colorbar=dict(
+                        title=f"{heatmap_variable} ({heatmap_stat})",
+                        titleside="right"
+                    )
+                )
+                
+                # Exibir o heatmap no Streamlit
+                st.plotly_chart(heatmap_chart, use_container_width=True)
+
+        # Display map with hover data
         st.write("### Device Locations with Measurements")
         map_chart = px.scatter_mapbox(
             stats,
