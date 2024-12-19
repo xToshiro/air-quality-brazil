@@ -26,7 +26,7 @@ The data includes air quality records from **August 1, 2024, to August 6, 2024**
 - **Graphs**: Line charts for temperature, humidity, and particulate matter
 - **Map**: Devices displayed on a map with geolocations
 - **Filters**: Time range, device selection, and data thresholds
-- **Implement New Visualizations**: Heatmaps, scatter plots, and advanced charts
+- **New Visualizations**: Heatmaps, scatter plots, and advanced charts
 
 ### 🔄 To Do
 - **Import Additional Sources**: Integrate other air quality networks
